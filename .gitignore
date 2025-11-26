@@ -1,0 +1,100 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+.venv/
+venv/
+ENV/
+env/
+.venv
+venv
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# VSCode settings
+.vscode/
+
+# Python egg files
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+bin/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+
+# Distribution / packaging
+pip-wheel-metadata/
+*.egg-info/
+.installed.cfg
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Logs
+*.log
+
+# Data and outputs
+*.csv
+*.tsv
+*.parquet
+*.xlsx
+*.xls
+*.db
+*.sqlite3
+*.h5
+
+# Model artifacts
+*.pkl
+*.joblib
+*.pt
+*.onnx
+*.sav
+
+# Secrets/credentials
+.env
+.env.*
+
+# Notebook-related outputs
+*.nbconvert.ipynb
+*.nbpipeline.ipynb
+*.nb.run.ipynb
+
+# Jupyter auto-generated/hidden
+.profile_default/
+.ipython/
+
+# Project-specific ignores
+docs/Proposal.ipynb
+
