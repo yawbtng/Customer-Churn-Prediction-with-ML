@@ -98,3 +98,7 @@ Desktop.ini
 # Project-specific ignores
 docs/Proposal.ipynb
 
+
+.cursor/
+Docs/
+
