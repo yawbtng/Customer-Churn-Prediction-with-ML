@@ -66,17 +66,16 @@ Desktop.ini
 *.log
 
 # Data and outputs
-*.csv
+
 *.tsv
 *.parquet
-*.xlsx
+
 *.xls
 *.db
 *.sqlite3
 *.h5
 
 # Model artifacts
-*.pkl
 *.joblib
 *.pt
 *.onnx
