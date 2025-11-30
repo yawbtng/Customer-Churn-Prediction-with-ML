@@ -528,6 +528,21 @@ if selected_customer_option:
     avg_probability = make_predictions(credit_score, location, gender, age, tenure, balance, 
         num_products, has_credit_card, is_active_member, estimated_salary, df)
 
+    # Calculate and display customer percentiles
+    st.markdown("------")
+    st.subheader("Customer Percentiles")
+    
+    customer_values = {
+        'CreditScore': credit_score,
+        'Balance': balance,
+        'EstimatedSalary': estimated_salary,
+        'Tenure': tenure,
+        'NumOfProducts': num_products
+    }
+    
+    percentiles = ut.calculate_customer_percentiles(customer_values, df)
+    fig_percentiles = ut.create_customer_percentiles_chart(percentiles)
+    st.plotly_chart(fig_percentiles, use_container_width=True)
 
     explanation = explain_prediction(avg_probability, input_dict, selected_surname)
 
