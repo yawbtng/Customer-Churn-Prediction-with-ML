@@ -4,6 +4,9 @@ import pickle
 import numpy as np
 import os
 from openai import OpenAI
+import utils as ut
+from dotenv import load_dotenv
+load_dotenv()
 
 client = OpenAI(
     base_url="https://api.groq.com/openai/v1",
@@ -11,6 +14,151 @@ client = OpenAI(
 )
 
 
+def explain_prediction(probability, input_dict, surname):
+    prompt = f"""
+        You are an expert data scientist at a bank, where you specialize in interpreting and explaining predictions of machine learning models.
+
+        Your machine learning model has predicted that a customer named {surname} has a {round(probability * 100, 1)} percent probability of churning, based on the information provided below.
+
+        Here is the customer's information:
+        {input_dict}
+
+        Here are the machine learning model's top 10 most important features for predicting churn:
+
+        Feature | Importance
+        --------------------
+        NumOfProducts     | 0.323888
+        IsActiveMember    | 0.164146
+        Age               | 0.109550
+        Geography_Germany | 0.091373
+        Balance           | 0.052786
+        Geography_France  | 0.046463
+        Gender_Female     | 0.045283
+        Geography_Spain   | 0.036855
+        CreditScore       | 0.036005
+        EstimatedSalary   | 0.032655
+        HasCrCard         | 0.031940
+        Tenure            | 0.030054
+        Gender_Male       | 0.000000
+
+
+        {pd.set_option('display.max_columns', None)}
+
+        Here are summary statistics for churned customers:
+        {df[df['Exited'] == 1].describe()}
+
+        Here are summary statistics for non-churned customers:
+        {df[df['Exited'] == 0].describe()}
+
+        - If the customer has OVER a 40 percent risk of churning, generate a 3-5 sentence explanation of why they are at risk of churning.
+        - If the customer has LESS THAN a 40 percent risk of churning, generate a 3-5 sentence explanation of why they might not be at risk of churning.
+        - Your explanation should be based on the customer's information, the summary statistics of churned and non-churned customers, and the feature importances provided.
+
+        Do not:
+        - Mention the probability of churning.
+        - Mention the actual percentage probability of churning as it will already be shown on the dashboard.
+        - Mention machine learning, models, predictions, algorithms, AI, training data, or feature importances.
+        - Use phrases like "the model thinks", "based on the prediction", "the system shows", or anything that reveals that an automated model is involved.
+
+        You are talking to an internal bank analyst, so you should be professional and use business language as they may not be familiar with the technical 
+        details of the model or the dataset.
+       """
+
+    print("EXPLANATION PROMPT:", prompt)
+
+    raw_response = client.chat.completions.create(
+        model="llama-3.1-8b-instant",
+        messages=[
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ]
+    )
+
+    return raw_response.choices[0].message.content
+
+
+def generate_email(probability, input_dict, explanation, surname):
+    # Convert probability to percentage for internal docs
+    churn_pct = round(probability * 100, 1)
+
+    # Define incentive bundles by churn tier
+    if probability < 0.30:
+        risk_tier = "low"
+        incentive_bundle = """
+            Low-risk incentive bundle (internal only):
+            - Waive one month of maintenance or service fees.
+            - Offer a small welcome-back bonus of loyalty points or cash (for example, $25–$50) if they keep their primary checking account active.
+            - Provide a small rate boost on a savings account for the next 6–12 months.
+            - Offer a quick financial check-in call to optimize their current products, without any pressure to add new ones.
+        """
+    elif probability < 0.60:
+        risk_tier = "medium"
+        incentive_bundle = """
+            Medium-risk incentive bundle (internal only):
+            - Waive 3 months of maintenance or service fees on their primary account.
+            - Offer a more meaningful cash-back or statement-credit bonus (for example, $75–$150) if they keep their accounts active and meet simple usage criteria.
+            - Provide a preferential rate on a savings, CD, or money market account for 12 months.
+            - Invite them to a personalized review with a dedicated banker to consolidate accounts, adjust limits, and tailor products to their goals.
+        """
+    else:
+        risk_tier = "high"
+        incentive_bundle = """
+            High-risk incentive bundle (internal only):
+            - Waive overdraft, maintenance, and transfer fees for the next 3–6 months, where policy allows.
+            - Offer a substantial retention bonus (for example, $150–$300) in loyalty points or statement credit if they keep their primary relationship and meet simple activity criteria.
+            - Provide a top-tier promotional rate on savings/CDs or a reduced rate on eligible loans, subject to credit approval.
+            - Assign a dedicated relationship manager to them, with priority access by phone or email.
+            - Offer to simplify and consolidate multiple accounts, automate key payments, and set up alerts tailored to their habits.
+        """
+
+    prompt = f"""
+        You are a manager at HS Bank. You are responsible for ensuring customers stay with the bank and are incentivized with thoughtful, customer-friendly offers.
+
+        INTERNAL INFORMATION (DO NOT MENTION DIRECTLY IN THE EMAIL):
+        - Customer surname: {surname}
+        - Internal churn risk percentage: {churn_pct}%
+        - Internal churn risk tier: {risk_tier.upper()}
+        - Why we believe they might consider leaving:
+        {explanation}
+        - Incentive bundle to use for this customer:
+        {incentive_bundle}
+
+        CUSTOMER INFORMATION (YOU MAY USE THIS IN THE EMAIL):
+        {input_dict}
+
+        WRITING TASK:
+        Write a warm, engaging, and professional email to this customer that encourages them to stay with the bank.
+
+        Email requirements:
+        - Include a short, friendly subject line.
+        - Start with a personal greeting using their last name (e.g., "Dear Mr. {surname}" or "Dear {surname} family" if last name is ambiguous).
+        - In the opening paragraph, thank them for being a customer and acknowledge the value of their relationship with the bank.
+        - In the next 1–2 paragraphs, briefly highlight how the bank can support their goals based on the customer information.
+        - Then include a section such as "Here are a few ways we can support you:" followed by bullet points.
+        - The bullet points must be a clear, customer-friendly rephrasing of the incentives from the incentive bundle above that corresponds to their risk tier. Do NOT invent new types of incentives beyond what is there, but you may adjust the exact wording to sound natural.
+        - Close with a clear, low-pressure call to action (for example, inviting them to reply to the email, schedule a call, or visit a branch) and a warm sign-off.
+
+        STYLE CONSTRAINTS:
+        - Do NOT mention churn risk, probabilities, models, AI, algorithms, predictions, or anything about internal scoring.
+        - Do NOT mention "risk tier" or "incentive bundle"; that is internal language only.
+        - The email should sound like it was written by a human relationship manager who genuinely wants to help the customer, not by an automated system.
+    """
+
+    raw_response = client.chat.completions.create(
+        model="llama-3.1-8b-instant",
+        messages=[
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+    )
+
+    print("\n\nEMAIL PROMPT\n", prompt)
+
+    return raw_response.choices[0].message.content
 
 
 
@@ -315,6 +463,19 @@ def make_predictions(credit_score, location, gender, age, tenure, balance, num_p
         
         st.write(f"Average Probability based on the best three models (⭐️): {avg_probability * 100:.2f}%")
 
+    col1, col2 = st.columns(2)
+
+    with col1:
+        fig = ut.create_gauge_chart(avg_probability)
+        st.plotly_chart(fig, use_container_width=True)
+        st.write(f"The customer has a {avg_probability * 100:.2f}% risk of churning.")
+    
+    with col2:
+        fig_probs = ut.create_model_probability_chart(probabilities)
+        st.plotly_chart(fig_probs, use_container_width=True)
+
+
+    return avg_probability
 
 
 st.title("Customer Churn Prediction")
@@ -346,6 +507,7 @@ if selected_customer_option:
         age = st.number_input("Age", value=int(selected_customer['Age']), min_value=18, max_value=100, step=1)
 
         tenure = st.number_input("Tenure (years)", min_value=0, max_value=50, step=1, value=int(selected_customer['Tenure']))
+
     
     with col2:
         balance = st.number_input("Balance", min_value=0.0, value=float(selected_customer['Balance']))
@@ -358,11 +520,28 @@ if selected_customer_option:
 
         estimated_salary = st.number_input("Estimated Salary", min_value=0.0, value=float(selected_customer['EstimatedSalary']))
 
-        
-    make_predictions(credit_score, location, gender, age, tenure, balance, 
+    
+    input_dict = prepare_input_basic(credit_score, location, gender, age, tenure, balance, 
+        num_products, has_credit_card, is_active_member, estimated_salary)
+
+
+    avg_probability = make_predictions(credit_score, location, gender, age, tenure, balance, 
         num_products, has_credit_card, is_active_member, estimated_salary, df)
 
 
+    explanation = explain_prediction(avg_probability, input_dict, selected_surname)
 
+    st.markdown("------")
+    st.subheader("Explanation of Prediction")
+
+    st.markdown(explanation)
+
+    email = generate_email(avg_probability, input_dict, explanation, selected_surname)
+
+    st.markdown("------")
+
+    st.subheader("Personalized Retention Email")
+
+    st.markdown(email)
     
 
