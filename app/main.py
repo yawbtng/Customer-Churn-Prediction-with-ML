@@ -4,6 +4,7 @@ import pickle
 import numpy as np
 import os
 from openai import OpenAI
+from openai import RateLimitError, APIError
 import utils as ut
 from dotenv import load_dotenv
 load_dotenv()
@@ -66,17 +67,39 @@ def explain_prediction(probability, input_dict, surname):
         details of the model or the dataset.
        """
 
-    raw_response = client.chat.completions.create(
-        model="llama-3.1-8b-instant",
-        messages=[
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ]
-    )
-
-    return raw_response.choices[0].message.content
+    try:
+        raw_response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+        )
+        return raw_response.choices[0].message.content
+    
+    except RateLimitError as e:
+        error_msg = str(e)
+        if "tokens per minute" in error_msg.lower() or "tpm" in error_msg.lower():
+            st.error("⚠️ **API Rate Limit Reached**: The explanation service is temporarily unavailable due to token rate limits. Please wait a moment and try again.")
+        else:
+            st.error("⚠️ **API Rate Limit Reached**: Too many requests. Please wait a moment and try again.")
+        # Return a fallback explanation
+        risk_level = "at risk of churning" if probability >= 0.40 else "likely to remain with the bank"
+        return f"Based on the customer's profile and account characteristics, this customer appears to be {risk_level}. Please review their account details and engagement metrics for more specific insights."
+    
+    except APIError as e:
+        st.error(f"⚠️ **API Error**: Unable to generate explanation. Error: {str(e)}")
+        # Return a fallback explanation
+        risk_level = "at risk of churning" if probability >= 0.40 else "likely to remain with the bank"
+        return f"Based on the customer's profile and account characteristics, this customer appears to be {risk_level}. Please review their account details and engagement metrics for more specific insights."
+    
+    except Exception as e:
+        st.error(f"⚠️ **Unexpected Error**: An error occurred while generating the explanation. Please try again later.")
+        # Return a fallback explanation
+        risk_level = "at risk of churning" if probability >= 0.40 else "likely to remain with the bank"
+        return f"Based on the customer's profile and account characteristics, this customer appears to be {risk_level}. Please review their account details and engagement metrics for more specific insights."
 
 
 def generate_email(probability, input_dict, explanation, surname):
@@ -148,17 +171,69 @@ def generate_email(probability, input_dict, explanation, surname):
         - Use simple line breaks between paragraphs and regular bullet points with dashes (-) or numbers if needed.
     """
 
-    raw_response = client.chat.completions.create(
-        model="llama-3.1-8b-instant",
-        messages=[
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ],
-    )
+    try:
+        raw_response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+        )
+        return raw_response.choices[0].message.content
+    
+    except RateLimitError as e:
+        error_msg = str(e)
+        if "tokens per minute" in error_msg.lower() or "tpm" in error_msg.lower():
+            st.error("⚠️ **API Rate Limit Reached**: The email generation service is temporarily unavailable due to token rate limits. Please wait a moment and try again.")
+        else:
+            st.error("⚠️ **API Rate Limit Reached**: Too many requests. Please wait a moment and try again.")
+        # Return a fallback email template
+        return f"""Subject: We Value Your Relationship with HS Bank
 
-    return raw_response.choices[0].message.content
+Dear Mr./Ms. {surname},
+
+Thank you for being a valued customer of HS Bank. We appreciate your continued trust in our services.
+
+We wanted to reach out to let you know that we're here to support your financial goals. Our team is available to help you make the most of your banking relationship.
+
+If you have any questions or would like to discuss how we can better serve you, please don't hesitate to contact us. We're here to help.
+
+Best regards,
+HS Bank Relationship Team"""
+    
+    except APIError as e:
+        st.error(f"⚠️ **API Error**: Unable to generate email. Error: {str(e)}")
+        # Return a fallback email template
+        return f"""Subject: We Value Your Relationship with HS Bank
+
+Dear Mr./Ms. {surname},
+
+Thank you for being a valued customer of HS Bank. We appreciate your continued trust in our services.
+
+We wanted to reach out to let you know that we're here to support your financial goals. Our team is available to help you make the most of your banking relationship.
+
+If you have any questions or would like to discuss how we can better serve you, please don't hesitate to contact us. We're here to help.
+
+Best regards,
+HS Bank Relationship Team"""
+    
+    except Exception as e:
+        st.error(f"⚠️ **Unexpected Error**: An error occurred while generating the email. Please try again later.")
+        # Return a fallback email template
+        return f"""Subject: We Value Your Relationship with HS Bank
+
+Dear Mr./Ms. {surname},
+
+Thank you for being a valued customer of HS Bank. We appreciate your continued trust in our services.
+
+We wanted to reach out to let you know that we're here to support your financial goals. Our team is available to help you make the most of your banking relationship.
+
+If you have any questions or would like to discuss how we can better serve you, please don't hesitate to contact us. We're here to help.
+
+Best regards,
+HS Bank Relationship Team"""
 
 
 
@@ -386,9 +461,15 @@ def prepare_input_advanced(credit_score, location, gender, age, tenure, balance,
 
 def get_prediction_probability(model, input_df):
     """Get prediction probability from a model, handling hard voting classifiers"""
+    # Convert DataFrame to numpy array to avoid feature name warnings
+    if isinstance(input_df, pd.DataFrame):
+        input_array = input_df.values
+    else:
+        input_array = input_df
+    
     try:
         # Try to get probability directly
-        return model.predict_proba(input_df)[0][1]
+        return model.predict_proba(input_array)[0][1]
     except AttributeError:
         # For hard voting classifiers, get probabilities from individual estimators
         try:
@@ -398,18 +479,18 @@ def get_prediction_probability(model, input_df):
                 probas = []
                 for name, estimator in model.named_estimators_.items():
                     try:
-                        proba = estimator.predict_proba(input_df)[0][1]
+                        proba = estimator.predict_proba(input_array)[0][1]
                         probas.append(proba)
                     except (AttributeError, KeyError):
                         # If estimator doesn't support predict_proba, use predict
-                        pred = estimator.predict(input_df)[0]
+                        pred = estimator.predict(input_array)[0]
                         probas.append(float(pred))
                 
                 if probas:
                     return np.mean(probas)
             
             # Fallback: use predict and convert to probability
-            prediction = model.predict(input_df)[0]
+            prediction = model.predict(input_array)[0]
             return float(prediction)
         except Exception:
             # Final fallback: return 0.5 (uncertain)
