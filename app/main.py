@@ -463,12 +463,12 @@ def make_predictions(credit_score, location, gender, age, tenure, balance, num_p
 
     with col1:
         fig = ut.create_gauge_chart(avg_probability)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         st.write(f"The customer has a {avg_probability * 100:.2f}% risk of churning.")
     
     with col2:
         fig_probs = ut.create_model_probability_chart(probabilities)
-        st.plotly_chart(fig_probs, use_container_width=True)
+        st.plotly_chart(fig_probs, width='stretch')
 
 
     return avg_probability
@@ -538,7 +538,7 @@ if selected_customer_option:
     
     percentiles = ut.calculate_customer_percentiles(customer_values, df)
     fig_percentiles = ut.create_customer_percentiles_chart(percentiles)
-    st.plotly_chart(fig_percentiles, use_container_width=True)
+    st.plotly_chart(fig_percentiles, width='stretch')
 
     explanation = explain_prediction(avg_probability, input_dict, selected_surname)
 
