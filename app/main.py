@@ -64,8 +64,6 @@ def explain_prediction(probability, input_dict, surname):
         details of the model or the dataset.
        """
 
-    print("EXPLANATION PROMPT:", prompt)
-
     raw_response = client.chat.completions.create(
         model="llama-3.1-8b-instant",
         messages=[
@@ -155,8 +153,6 @@ def generate_email(probability, input_dict, explanation, surname):
             }
         ],
     )
-
-    print("\n\nEMAIL PROMPT\n", prompt)
 
     return raw_response.choices[0].message.content
 
