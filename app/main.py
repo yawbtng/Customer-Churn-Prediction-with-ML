@@ -50,9 +50,11 @@ def explain_prediction(probability, input_dict, surname):
         Here are summary statistics for non-churned customers:
         {df[df['Exited'] == 0].describe()}
 
-        - If the customer has OVER a 40 percent risk of churning, generate a 3-5 sentence explanation of why they are at risk of churning.
-        - If the customer has LESS THAN a 40 percent risk of churning, generate a 3-5 sentence explanation of why they might not be at risk of churning.
-        - Your explanation should be based on the customer's information, the summary statistics of churned and non-churned customers, and the feature importances provided.
+        TASK: Generate a single 4-6 sentence explanation based on the customer's predicted churn probability of {round(probability * 100, 1)}%.
+        
+        {"Since the probability is 40% or higher, explain why this customer is at risk of churning." if probability >= 0.40 else "Since the probability is below 40%, explain why this customer is likely to remain with the bank."}
+        
+        Your explanation should be based on the customer's information, the summary statistics of churned and non-churned customers, and the feature importances provided. Provide ONLY ONE explanation - do not provide multiple scenarios or alternative explanations.
 
         Do not:
         - Mention the probability of churning.
@@ -142,6 +144,8 @@ def generate_email(probability, input_dict, explanation, surname):
         - Do NOT mention churn risk, probabilities, models, AI, algorithms, predictions, or anything about internal scoring.
         - Do NOT mention "risk tier" or "incentive bundle"; that is internal language only.
         - The email should sound like it was written by a human relationship manager who genuinely wants to help the customer, not by an automated system.
+        - Use plain text formatting only - do NOT use markdown syntax (no asterisks, no bold, no special formatting characters).
+        - Use simple line breaks between paragraphs and regular bullet points with dashes (-) or numbers if needed.
     """
 
     raw_response = client.chat.completions.create(
@@ -552,7 +556,9 @@ if selected_customer_option:
     st.markdown("------")
 
     st.subheader("Personalized Retention Email")
-
-    st.markdown(email)
+    
+    # Clean up any markdown formatting characters that might interfere
+    email_clean = email.replace('**', '').replace('*', '').replace('__', '').replace('_', '')
+    st.markdown(email_clean)
     
 
